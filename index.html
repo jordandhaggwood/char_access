@@ -5,18 +5,13 @@
 </head>
 <body>
   <h1>Load Character Sheet from GitHub</h1>
-
+  
   <input type="text" id="tokenInput" placeholder="Enter your GitHub token" size="50">
   <button onclick="saveToken()">Save Token</button>
   <button onclick="loadCharacterSheet()">Load Sheet</button>
   <pre id="output"></pre>
 
   <script>
-    const owner = 'jordandhaggwood';
-    const repo = '5e_pdf';
-    const htmlPath = 'index.html';
-    const pdfPath = 'Vornan.pdf';
-
     window.onload = () => {
       const savedToken = localStorage.getItem('githubToken');
       if (savedToken) {
@@ -34,17 +29,6 @@
       }
     }
 
-    async function fetchGitHubFile(path, token, raw = false) {
-      const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
-      const headers = {
-        Authorization: `token ${token}`,
-        Accept: raw ? 'application/vnd.github.v3.raw' : 'application/vnd.github.v3+json'
-      };
-      const response = await fetch(url, { headers });
-      if (!response.ok) throw new Error(`Failed to fetch ${path}: ${response.status}`);
-      return raw ? response.text() : response.blob();
-    }
-
     async function loadCharacterSheet() {
       const token = localStorage.getItem('githubToken') || document.getElementById('tokenInput').value.trim();
       if (!token) {
@@ -52,21 +36,31 @@
         return;
       }
 
+      const owner = 'jordandhaggwood';
+      const repo = '5e_pdf';
+      const path = 'index.html';
+
       try {
-        const [htmlContent, pdfBlob] = await Promise.all([
-          fetchGitHubFile(htmlPath, token, true),
-          fetchGitHubFile(pdfPath, token, false)
-        ]);
+        const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+          headers: {
+            Authorization: `token ${token}`,
+            Accept: 'application/vnd.github.v3.raw',  // important to get raw HTML
+          },
+        });
 
-        const pdfBlobUrl = URL.createObjectURL(pdfBlob);
-        const updatedHtml = htmlContent.replace(/data=["']Vornan\.pdf["']/i, `data="${pdfBlobUrl}"`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
 
+        const content = await response.text();
+
+        // This writes the entire fetched index.html including iframe to the document
         document.open();
-        document.write(updatedHtml);
+        document.write(content);
         document.close();
 
       } catch (error) {
-        document.getElementById('output').textContent = 'Error loading character sheet: ' + error;
+        document.getElementById('output').textContent = 'Error fetching file: ' + error.message;
       }
     }
   </script>
